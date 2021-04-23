@@ -154,9 +154,9 @@
   (concat "[ \t]*\\[\\(" keyword "\\)[ \t]+\\(" param1 "\\)[] \t]"))
 
 (defun lux-find-file (file)
-  "Wrapper for find-file-existing"
-  (let* ((mark (copy-marker (point-marker)))
-         (new-file (lux-expand-file file)))
+  "Wrapper for find-file-existing."
+  (let ((new-file (lux-check-include file))
+        (mark (copy-marker (point-marker))))
     (find-file-existing new-file)
     (ring-insert-at-beginning (lux-window-history-ring) mark)))
 
