@@ -1,3 +1,5 @@
+;;; lux-mode.el --- minor mode for working with LUX
+
 ;; Copyright 2012-2021 Tail-f Systems AB
 ;;
 ;; See the file "LICENSE" for information on usage and redistribution
