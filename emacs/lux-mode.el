@@ -199,18 +199,19 @@ and make an entry in lux-window-history-ring."
 
 (defun lux-find-external-macro (macro-regexp)
   ""
-  (let ((mark     (copy-marker (point-marker)))
-        (includes (lux-list-includes))
-        (found    nil))
+  (let* ((mark         (copy-marker (point-marker)))
+         (includes     (lux-list-includes))
+         (locals       (directory-files "./" 'full "luxinc"))
+         (search-files (append includes locals))
+         (found        nil))
     (with-temp-buffer
       (save-excursion
-        (while (and includes (not found))
-          (let ((cur-file (lux-expand-file (car includes))))
-            (insert-file-contents cur-file nil nil nil t)
-            (goto-char (point-min))
-            (when (re-search-forward macro-regexp nil t)
-              (setq found cur-file))
-            (pop includes)))))
+        (while (and search-files (not found))
+          (insert-file-contents (car search-files) nil nil nil t)
+          (goto-char (point-min))
+          (when (re-search-forward macro-regexp nil t)
+            (setq found (car search-files)))
+          (pop search-files))))
     (when found
       (lux-find-file found)
       (goto-char (point-min))
@@ -220,26 +221,94 @@ and make an entry in lux-window-history-ring."
 
 (defun lux-list-includes ()
   "Return a list of lux include files"
-  (let ((files nil))
-    (save-excursion
+  (save-excursion
+    (let ((include-files nil)
+          (child-include-files nil))
       (goto-char (point-min))
       (while (re-search-forward (lux-build-meta-regexp "include") nil t)
-        (setq files (append files (cons (match-string-no-properties 2) nil))))
-      files)))
+        (let* ((path (match-string-no-properties 2))
+               (new-path (lux-check-include path))
+               (commented (lux-check-commented))
+               (test (and (not (equal new-path nil))
+                          (equal commented nil))))
+          (when test
+            (with-current-buffer
+                (find-file-noselect new-path)
+              (setq child-include-files (lux-list-includes))
+              (when child-include-files
+                (setq include-files
+                      (append include-files child-include-files))))
+            (setq include-files (append include-files (cons new-path nil))))))
+      include-files)))
 
-(defun lux-expand-file (orig-file)
-  "Expand environment variables and ask user if non-existent"
-  (let*
-      ((file (expand-file-name (substitute-in-file-name orig-file)))
-       (dir (file-name-directory file)))
-    (if (not (file-exists-p orig-file))
-        (read-file-name
-         "OK? "
-         "/" ;; dir
-         file
-        'confirm-after-completion
-         file)
-      orig-file)))
+(defun lux-check-include (path)
+  "Give a chance to lookup enviroment variable.
+If the path including enviroment variable, try to lookup the value.
+If not possible to lookup the value, return nil."
+  (if (string-match "\\$" path)
+      (let ((new-path (substitute-in-file-name path)))
+        (if (equal new-path path) nil new-path))
+    (expand-file-name path)))
+
+(defun lux-check-commented ()
+  "Check whether the include file is commented or not.
+If the include file is commented, return nil."
+  (save-excursion
+    (let ((stop (point))
+          (start (progn (re-search-backward "^\s*#*\s*\\[")
+                        (point))))
+      (narrow-to-region start stop)
+      (setq commented (condition-case nil
+                          (re-search-forward "^\s*#+\s*\\[")
+                        (error nil)))
+      (widen)
+      commented)))
+
+(defun lux-check-include (path)
+  "Give a chance to lookup enviroment variable.
+If the path including enviroment variable, try to lookup the value.
+If not possible to lookup the value, return nil."
+  (if (string-match "\\$" path)
+      (let ((new-path (substitute-in-file-name path)))
+        (if (equal new-path path) nil new-path))
+    path))
+
+(defun lux-check-commented ()
+  "Check whether the include file is commented or not.
+If the include file is commented, return nil."
+  (save-excursion
+    (let ((stop (point))
+          (start (progn (re-search-backward "^\s*#*\s*\\[")
+                        (point))))
+      (narrow-to-region start stop)
+      (setq commented (condition-case nil
+                          (re-search-forward "^\s*#+\s*\\[")
+                        (error nil)))
+      (widen)
+      commented)))
+
+(defun lux-check-include (path)
+  "Give a chance to lookup enviroment variable.
+If the path including enviroment variable, try to lookup the value.
+If not possible to lookup the value, return nil."
+  (if (string-match "\\$" path)
+      (let ((new-path (substitute-in-file-name path)))
+        (if (equal new-path path) nil new-path))
+    path))
+
+(defun lux-check-commented ()
+  "Check whether the include file is commented or not.
+If the include file is commented, return nil."
+  (save-excursion
+    (let ((stop (point))
+          (start (progn (re-search-backward "^\s*#*\s*\\[")
+                        (point))))
+      (narrow-to-region start stop)
+      (setq commented (condition-case nil
+                          (re-search-forward "^\s*#+\s*\\[")
+                        (error nil)))
+      (widen)
+      commented)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Autoload
